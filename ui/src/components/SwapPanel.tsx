@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Contract } from 'ethers';
+import { Contract, type InterfaceAbi } from 'ethers';
 import { useReadContract } from 'wagmi';
 import type { Abi } from 'viem';
 
@@ -21,6 +21,7 @@ export function SwapPanel({ address, isConnected, signerPromise, contracts }: Pr
   const [message, setMessage] = useState<string | null>(null);
 
   const swapAbi = (contracts?.swap.abi ?? ([] as Abi));
+  const swapInterfaceAbi = swapAbi as InterfaceAbi;
   const swapAddress = contracts?.swap.address ?? ZERO_ADDRESS;
 
   const { data: liquidityData, refetch: refetchLiquidity } = useReadContract({
@@ -42,7 +43,7 @@ export function SwapPanel({ address, isConnected, signerPromise, contracts }: Pr
   });
 
   const expectedCusdt = useMemo(() => {
-    if (!rateData || !ethAmount) {
+    if (typeof rateData !== 'bigint' || !ethAmount) {
       return '0';
     }
     try {
@@ -50,7 +51,7 @@ export function SwapPanel({ address, isConnected, signerPromise, contracts }: Pr
       if (wei <= 0n) {
         return '0';
       }
-      const rate = BigInt(rateData);
+      const rate = rateData;
       const quote = (wei * rate * 10n ** BigInt(TOKEN_DECIMALS)) / 10n ** 18n;
       return formatTokenBalance(quote, TOKEN_DECIMALS, 6);
     } catch {
@@ -78,7 +79,7 @@ export function SwapPanel({ address, isConnected, signerPromise, contracts }: Pr
         throw new Error('Enter a positive ETH amount.');
       }
 
-      const swapContract = new Contract(swapAddress, swapAbi, signer);
+      const swapContract = new Contract(swapAddress, swapInterfaceAbi, signer);
       const tx = await swapContract.swap({ value });
       setStatus('pending');
       await tx.wait();

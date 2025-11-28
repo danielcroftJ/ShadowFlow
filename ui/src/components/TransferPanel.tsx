@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Contract } from 'ethers';
+import { Contract, type InterfaceAbi } from 'ethers';
 import type { JsonRpcSigner } from 'ethers';
 import type { Abi } from 'viem';
 
@@ -22,6 +22,7 @@ export function TransferPanel({ address, signerPromise, contracts, instance, isZ
   const [message, setMessage] = useState<string | null>(null);
 
   const tokenAbi = (contracts?.cusdt.abi ?? ([] as Abi));
+  const tokenInterfaceAbi = tokenAbi as InterfaceAbi;
   const tokenAddress = contracts?.cusdt.address ?? ZERO_ADDRESS;
 
   const handleTransfer = async () => {
@@ -53,7 +54,7 @@ export function TransferPanel({ address, signerPromise, contracts, instance, isZ
       buffer.add64(units);
       const encryptedAmount = await buffer.encrypt();
 
-      const tokenContract = new Contract(tokenAddress, tokenAbi, signer);
+      const tokenContract = new Contract(tokenAddress, tokenInterfaceAbi, signer);
       const tx = await tokenContract['confidentialTransfer(address,bytes32,bytes)'](
         normalizedRecipient,
         encryptedAmount.handles[0],
