@@ -1,0 +1,34 @@
+.header {
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.header-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.header-eyebrow {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6366f1;
+  margin: 0 0 0.4rem 0;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 2rem;
+  color: #111827;
+}
+
+.header-subtitle {
+  margin: 0.25rem 0 0;
+  color: #4b5563;
+  max-width: 40rem;
+}
