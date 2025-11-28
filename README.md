@@ -1,110 +1,121 @@
-# FHEVM Hardhat Template
+# ShadowFlow – Confidential ETH ➜ cUSDT Swap
 
-A Hardhat-based template for developing Fully Homomorphic Encryption (FHE) enabled Solidity smart contracts using the
-FHEVM protocol by Zama.
+ShadowFlow delivers a fixed-rate ETH-to-cUSDT swap with full on-chain confidentiality powered by the Zama FHEVM stack. Users swap ETH at a deterministic 1 ETH = 4000 cUSDT price, hold balances privately, decrypt on demand, and transfer cUSDT without exposing cleartext values on-chain.
 
-## Quick Start
+## Why ShadowFlow
+- **End-to-end privacy**: Encrypted balances and transfers through FHEVM and the Zama relayer SDK. On-chain state never reveals cleartext amounts.
+- **Deterministic pricing**: Fixed 1 ETH = 4000 cUSDT keeps UX predictable and limits oracle dependencies.
+- **Non-custodial flows**: Users retain control; the swap contract only mints and delivers confidential tokens while collecting ETH fees.
+- **Operational safety**: Liquidity is explicitly seeded and tracked; ETH withdrawals are owner-gated; reentrancy-safe execution.
+- **Developer clarity**: Tests, typed contracts, and a React + Vite frontend that uses viem for reads and ethers for writes, matching the production integration model.
 
-For detailed instructions see:
-[FHEVM Hardhat Quick Start Tutorial](https://docs.zama.ai/protocol/solidity-guides/getting-started/quick-start-tutorial)
+## What the project solves
+- **Private stable exposure**: Acquire a stable-denominated asset (cUSDT) without leaking swap sizes or holdings.
+- **Confidential transfers**: Move balances privately using client-side encryption with access control enforced by the FHEVM.
+- **Auditable yet private**: Liquidity, swap events, and ETH fees remain transparent, while individual balances and transfer amounts stay encrypted.
+- **Predictable onboarding**: A single fixed rate removes price discovery frictions for users new to confidential assets.
 
-### Prerequisites
+## Core architecture
+### Smart contracts
+- **ConfidentialUSDT (contracts/ConfidentialUSDT.sol)**: ERC7984 confidential token (6 decimals, symbol `cUSDT`). Mints in fixed 100 cUSDT units using FHE encrypted amounts. Immutable and not modified by swaps.
+- **ConfidentialSwap (contracts/ConfidentialSwap.sol)**: Ownable, reentrancy-safe swap. Accepts ETH and delivers encrypted cUSDT at 1:4000. Owner seeds liquidity in batches of 100 cUSDT (max 5 batches per call) and can withdraw collected ETH. View helpers expose quotas and minted/distributed liquidity without relying on `msg.sender`.
+- **FHECounter (contracts/FHECounter.sol)**: Reference FHE sample retained for development/testing.
 
-- **Node.js**: Version 20 or higher
-- **npm or yarn/pnpm**: Package manager
+### Frontend (ui/)
+- Built with **React + Vite + TypeScript**, **RainbowKit** for wallet UX, **wagmi/viem** for reads, **ethers** for writes.
+- **Swap panel**: Execute ETH → cUSDT swaps on Sepolia; shows fixed quote and live available liquidity.
+- **Balance panel**: Displays encrypted balance handles and lets users decrypt via `@zama-fhe/relayer-sdk`.
+- **Transfer panel**: Client-side encryption plus ACL-aware cUSDT transfers using the confidential transfer entrypoint.
+- Targets the Sepolia network only; no localhost networks or frontend env vars are used.
 
-### Installation
+## Tech stack
+- **Hardhat + TypeScript** for compilation, testing, and deployment.
+- **@fhevm/solidity** and **@zama-fhe/relayer-sdk** for confidential computation and client encryption.
+- **hardhat-deploy**, **ethers v6**, **typechain**, **solidity-coverage**, **eslint/prettier** for reliability and DX.
+- **React, Vite, wagmi, RainbowKit, viem** for the application layer.
 
-1. **Install dependencies**
+## Repository layout
+- `contracts/` – ConfidentialUSDT, ConfidentialSwap, reference FHECounter.
+- `deploy/` – Hardhat deployment script that seeds liquidity post-deploy.
+- `deployments/` – Generated artifacts and ABIs (use these ABIs for the frontend).
+- `tasks/` – Custom Hardhat tasks.
+- `test/` – Unit tests for swap and FHE components.
+- `ui/` – Frontend application (no Tailwind, Sepolia-only).
+- `docs/` – Zama protocol and relayer notes (`docs/zama_llm.md`, `docs/zama_doc_relayer.md`).
 
+## Prerequisites
+- Node.js 20+
+- npm
+- Sepolia RPC access via **Infura** (uses `process.env.INFURA_API_KEY`).
+- Deployment key via **`process.env.PRIVATE_KEY`** (private key only, no mnemonics).
+- Optional: `process.env.ETHERSCAN_API_KEY` for verification.
+
+## Backend setup and usage
+1. Install dependencies:
    ```bash
    npm install
    ```
-
-2. **Set up environment variables**
-
+2. Configure environment variables in a `.env` file:
    ```bash
-   npx hardhat vars set MNEMONIC
-
-   # Set your Infura API key for network access
-   npx hardhat vars set INFURA_API_KEY
-
-   # Optional: Set Etherscan API key for contract verification
-   npx hardhat vars set ETHERSCAN_API_KEY
+   INFURA_API_KEY=<your_infura_key>
+   PRIVATE_KEY=<deployer_private_key>
+   ETHERSCAN_API_KEY=<optional_for_verification>
    ```
-
-3. **Compile and test**
-
+3. Compile and test:
    ```bash
    npm run compile
-   npm run test
+   npm run test            # Hardhat network with FHE mocks
+   npm run coverage        # Optional coverage
    ```
-
-4. **Deploy to local network**
-
+4. Local development utilities:
    ```bash
-   # Start a local FHEVM-ready node
-   npx hardhat node
-   # Deploy to local network
-   npx hardhat deploy --network localhost
+   npm run chain           # Hardhat node (FHE mock)
+   npm run deploy:localhost
    ```
-
-5. **Deploy to Sepolia Testnet**
-
+5. Deploy to Sepolia (seeds liquidity automatically: 5 batches x 100 cUSDT):
    ```bash
-   # Deploy to Sepolia
-   npx hardhat deploy --network sepolia
-   # Verify contract on Etherscan
-   npx hardhat verify --network sepolia <CONTRACT_ADDRESS>
+   npm run deploy:sepolia
    ```
-
-6. **Test on Sepolia Testnet**
-
+6. (Optional) Verify on Etherscan:
    ```bash
-   # Once deployed, you can run a simple test on Sepolia.
-   npx hardhat test --network sepolia
+   npm run verify:sepolia -- <ConfidentialSwap_address>
    ```
 
-## 📁 Project Structure
+### Contract behaviors at a glance
+- **Swap rate**: 1 ETH = 4000 cUSDT (6 decimals).
+- **Liquidity model**: Owner mints in 100 cUSDT increments; max 5 mint batches per call; available liquidity = minted – distributed.
+- **Access control**: Owner-only liquidity seeding and ETH withdrawals; swaps are nonReentrant.
+- **Views**: `availableLiquidity`, `mintedLiquidity`, `distributedLiquidity`, `quote`, `mintUnit`, `tokenDecimals`.
 
-```
-fhevm-hardhat-template/
-├── contracts/           # Smart contract source files
-│   └── FHECounter.sol   # Example FHE counter contract
-├── deploy/              # Deployment scripts
-├── tasks/               # Hardhat custom tasks
-├── test/                # Test files
-├── hardhat.config.ts    # Hardhat configuration
-└── package.json         # Dependencies and scripts
-```
+## Frontend setup (ui/)
+1. Install dependencies:
+   ```bash
+   cd ui
+   npm install
+   ```
+2. Configure wallet connectivity:
+   - Update `ui/src/config/wagmi.ts` with your WalletConnect `projectId`.
+3. Wire deployed contracts:
+   - Copy ABIs from `deployments/sepolia/*.json` into `ui/src/config/abis.ts` (they must stay in sync with deployments).
+   - Set deployed addresses in `ui/src/config/contracts.ts` (Sepolia only; no localhost endpoints).
+4. Run the app:
+   ```bash
+   npm run dev
+   ```
+5. Usage:
+   - Connect a Sepolia wallet, swap ETH→cUSDT, view encrypted balance handles, decrypt via the relayer SDK, and send confidential transfers (ethers for writes, viem for reads).
 
-## 📜 Available Scripts
+## Future roadmap
+- **Dynamic pricing and oracle integration** while preserving confidentiality guarantees.
+- **Multi-asset support** for additional confidential stable assets and pairs.
+- **Liquidity provider tooling**: dashboards for seeding/withdrawing and automated rebalancing.
+- **Production hardening**: subgraph indexing, alerting, gas optimizations, and fuzz/property-based testing.
+- **UX refinements**: richer transaction status, mobile optimizations, and progressive rollouts of relayer SDK features.
 
-| Script             | Description              |
-| ------------------ | ------------------------ |
-| `npm run compile`  | Compile all contracts    |
-| `npm run test`     | Run all tests            |
-| `npm run coverage` | Generate coverage report |
-| `npm run lint`     | Run linting checks       |
-| `npm run clean`    | Clean build artifacts    |
+## References
+- Zama protocol docs: see `docs/zama_llm.md` and `docs/zama_doc_relayer.md`.
+- FHEVM Solidity library: [https://docs.zama.ai/fhevm](https://docs.zama.ai/fhevm)
+- RainbowKit / wagmi: [https://www.rainbowkit.com/docs/introduction](https://www.rainbowkit.com/docs/introduction)
 
-## 📚 Documentation
-
-- [FHEVM Documentation](https://docs.zama.ai/fhevm)
-- [FHEVM Hardhat Setup Guide](https://docs.zama.ai/protocol/solidity-guides/getting-started/setup)
-- [FHEVM Testing Guide](https://docs.zama.ai/protocol/solidity-guides/development-guide/hardhat/write_test)
-- [FHEVM Hardhat Plugin](https://docs.zama.ai/protocol/solidity-guides/development-guide/hardhat)
-
-## 📄 License
-
-This project is licensed under the BSD-3-Clause-Clear License. See the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **GitHub Issues**: [Report bugs or request features](https://github.com/zama-ai/fhevm/issues)
-- **Documentation**: [FHEVM Docs](https://docs.zama.ai)
-- **Community**: [Zama Discord](https://discord.gg/zama)
-
----
-
-**Built with ❤️ by the Zama team**
+## License
+BSD-3-Clause-Clear. See `LICENSE`.
